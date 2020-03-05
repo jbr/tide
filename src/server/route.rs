@@ -54,6 +54,24 @@ impl<'a, State: 'static> Route<'a, State> {
         }
     }
 
+    /// Get the current path.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    // /// Serve up a static directory.
+    // pub fn dir(&mut self, dir: &Path) -> http_types::Result<()> {
+    //     for entry in WalkDir::new(dir) {
+    //         let entry = entry?;
+    //         if !entry.file_type().is_dir() {
+    //             let p = entry.into_path();
+    //             continue;
+    //         }
+    //         // self.at(entry.name()).get(/* serve file */)
+    //     }
+    //     todo!();
+    // }
+
     /// Treat the current path as a prefix, and strip prefixes from requests.
     ///
     /// This method is marked unstable as its name might change in the near future.

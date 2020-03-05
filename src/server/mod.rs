@@ -5,7 +5,6 @@ use async_std::io;
 use async_std::net::ToSocketAddrs;
 use async_std::sync::Arc;
 use async_std::task::{Context, Poll};
-
 use http_service::HttpService;
 
 use std::pin::Pin;
