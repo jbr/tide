@@ -1,5 +1,8 @@
+use std::io;
+use std::path::Path;
 use std::sync::Arc;
 
+use super::serve_dir::ServeDir;
 use crate::endpoint::MiddlewareEndpoint;
 use crate::utils::BoxFuture;
 use crate::{router::Router, Endpoint, Middleware, Response};
@@ -108,6 +111,15 @@ impl<'a, State: 'static> Route<'a, State> {
         self.all(service.into_http_service());
         self.prefix = false;
         self
+    }
+
+    /// Serve a directory statically.
+    pub fn serve_dir(&mut self, dir: impl AsRef<Path>) -> io::Result<()> {
+        // Verify path exists, return error if it doesn't.
+        let dir = dir.as_ref().to_owned().canonicalize()?;
+        let prefix = self.path().to_string();
+        self.at("*").get(ServeDir::new(prefix, dir));
+        Ok(())
     }
 
     /// Add an endpoint for the given HTTP method

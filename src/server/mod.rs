@@ -17,6 +17,7 @@ use crate::{
 };
 
 mod route;
+mod serve_dir;
 
 pub use route::Route;
 
