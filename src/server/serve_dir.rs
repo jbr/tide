@@ -34,9 +34,23 @@ impl<State> Endpoint<State> for ServeDir {
                     log::info!("File not found: {:?}", dir);
                     return Response::new(StatusCode::NotFound);
                 }
-                Ok(file) => {
-                    // TODO: verify this is a sub-path of the original dir.
-                    File::open(file).await.unwrap() // TODO: remove unwrap
+                Ok(mut file_path) => {
+                    // Verify this is a sub-path of the original dir.
+                    let mut file_iter = (&mut file_path).iter();
+                    for lhs in &dir {
+                        if Some(lhs) != file_iter.next() {
+                            return Response::new(StatusCode::Forbidden);
+                        }
+                    }
+
+                    // Open the file and send back the contents.
+                    match File::open(&file_path).await {
+                        Ok(file) => file,
+                        Err(_) => {
+                            log::warn!("Could not open {:?}", file_path);
+                            return Response::new(StatusCode::Forbidden);
+                        }
+                    }
                 }
             };
 
