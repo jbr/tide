@@ -280,6 +280,32 @@ impl<State: Send + Sync + 'static> Server<State> {
 
     /// Asynchronously serve the app at the given address.
     #[cfg(feature = "h1-server")]
+    pub async fn listen_on<S, IO>(self, mut incoming: S) -> io::Result<()>
+    where
+        S: Stream<Item = io::Result<IO>> + Unpin + Send + Sync,
+        IO: io::Read + io::Write + Clone + Send + Sync + Unpin + 'static,
+    {
+        while let Some(stream) = incoming.next().await {
+            let stream = stream?;
+            let this = self.clone();
+            task::spawn(async move {
+                let res = async_h1::accept(stream, |req| async {
+                    let res = this.respond(req).await;
+                    let res = res.map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+                    Ok(res)
+                })
+                .await;
+
+                if let Err(err) = res {
+                    log::error!("async-h1 error", { error: err.to_string() });
+                }
+            });
+        }
+        Ok(())
+    }
+
+    /// Asynchronously serve the app at the given address.
+    #[cfg(feature = "h1-server")]
     pub async fn listen(self, addr: impl ToSocketAddrs) -> io::Result<()> {
         let listener = async_std::net::TcpListener::bind(addr).await?;
 
