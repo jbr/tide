@@ -454,8 +454,7 @@ impl<State: Sync + Send + 'static, InnerState: Sync + Send + 'static> Endpoint<S
                 next_middleware: &middleware,
             };
 
-            let res = next.run(req).await?;
-            Ok(res)
+            Ok(next.run(req).await)
         })
     }
 }
