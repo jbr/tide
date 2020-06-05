@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Index;
+use std::sync::Arc;
 
 use crate::http::cookies::Cookie;
 use crate::http::headers::{self, HeaderName, HeaderValues, ToHeaderValues};
-use crate::http::Mime;
-use crate::http::{self, Body, StatusCode};
+use crate::http::{self, Body, Error, Mime, StatusCode};
 
 #[derive(Debug)]
 pub(crate) enum CookieEvent {
@@ -30,6 +30,16 @@ impl Response {
         S::Error: Debug,
     {
         let res = http::Response::new(status);
+        Self {
+            res,
+            cookie_events: vec![],
+        }
+    }
+
+    /// Create a new instance from an `http_types::Error`.
+    #[must_use]
+    pub fn from_error(err: Error) -> Self {
+        let res = http::Response::from_error(err);
         Self {
             res,
             cookie_events: vec![],
@@ -204,6 +214,16 @@ impl Response {
         self.cookie_events.push(CookieEvent::Removed(cookie));
     }
 
+    /// Returns an optional reference to the `Error` if the response was created from one, or else `None`.
+    pub fn error(&mut self) -> Option<&Error> {
+        self.res.error()
+    }
+
+    /// Takes the `Error` from the response if one exists, replacing it with `None`.
+    pub fn take_error(&mut self) -> Option<Arc<Error>> {
+        self.res.take_error()
+    }
+
     /// Get a response scoped extension value.
     #[must_use]
     pub fn ext<T: Send + Sync + 'static>(&self) -> Option<&T> {
@@ -268,6 +288,21 @@ impl From<serde_json::Value> for Response {
                 res
             })
             .unwrap_or_else(|_| Response::new(StatusCode::InternalServerError))
+    }
+}
+
+impl From<Error> for Response {
+    fn from(err: Error) -> Self {
+        Self::from_error(err)
+    }
+}
+
+impl From<crate::Result> for Response {
+    fn from(result: crate::Result) -> Self {
+        match result {
+            Ok(res) => res,
+            Err(err) => err.into(),
+        }
     }
 }
 
