@@ -75,8 +75,7 @@ where
 /// use tide::{After, Response, http};
 ///
 /// let mut app = tide::new();
-/// app.middleware(After(|res: tide::Result| async move {
-///     let res = res.unwrap_or_else(|e| Response::new(e.status()));
+/// app.middleware(After(|res: Response| async move {
 ///     match res.status() {
 ///         http::StatusCode::NotFound => Ok("Page not found".into()),
 ///         http::StatusCode::InternalServerError => Ok("Something went wrong".into()),
@@ -98,8 +97,8 @@ where
         next: Next<'a, State>,
     ) -> BoxFuture<'a, crate::Result> {
         Box::pin(async move {
-            let result = next.run(request).await;
-            (self.0)(result).await
+            let response = next.run(request).await;
+            (self.0)(response).await
         })
     }
 }
@@ -127,10 +126,10 @@ pub struct Next<'a, State> {
     pub(crate) next_middleware: &'a [Arc<dyn Middleware<State>>],
 }
 
-impl<'a, State: 'static> Next<'a, State> {
+impl<'a, State: 'static + Send + Sync> Next<'a, State> {
     /// Asynchronously execute the remaining middleware chain.
     #[must_use]
-    pub async fn run(mut self, req: Request<State>) -> BoxFuture<'a, Response> {
+    pub fn run(mut self, req: Request<State>) -> BoxFuture<'a, Response> {
         Box::pin(async move {
             if let Some((current, next)) = self.next_middleware.split_first() {
                 self.next_middleware = next;
@@ -138,6 +137,6 @@ impl<'a, State: 'static> Next<'a, State> {
             } else {
                 self.endpoint.call(req).await.into()
             }
-        }
+        })
     }
 }

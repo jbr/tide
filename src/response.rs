@@ -1,7 +1,6 @@
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Index;
-use std::sync::Arc;
 
 use crate::http::cookies::Cookie;
 use crate::http::headers::{self, HeaderName, HeaderValues, ToHeaderValues};
@@ -30,16 +29,6 @@ impl Response {
         S::Error: Debug,
     {
         let res = http::Response::new(status);
-        Self {
-            res,
-            cookie_events: vec![],
-        }
-    }
-
-    /// Create a new instance from an `http_types::Error`.
-    #[must_use]
-    pub fn from_error(err: Error) -> Self {
-        let res = http::Response::from_error(err);
         Self {
             res,
             cookie_events: vec![],
@@ -220,7 +209,7 @@ impl Response {
     }
 
     /// Takes the `Error` from the response if one exists, replacing it with `None`.
-    pub fn take_error(&mut self) -> Option<Arc<Error>> {
+    pub fn take_error(&mut self) -> Option<Error> {
         self.res.take_error()
     }
 
@@ -293,7 +282,8 @@ impl From<serde_json::Value> for Response {
 
 impl From<Error> for Response {
     fn from(err: Error) -> Self {
-        Self::from_error(err)
+        let res: http::Response = err.into();
+        res.into()
     }
 }
 
