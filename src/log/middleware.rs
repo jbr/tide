@@ -39,14 +39,15 @@ impl LogMiddleware {
         let start = std::time::Instant::now();
         let response = next.run(ctx).await;
         let status = response.status();
-        if status.is_server_error() {
-            log::error!("--> Response sent", {
+        if let Some(error) = response.error() {
+            log::error!("--> Response error", {
+                message: error.to_string(),
                 method: method,
                 path: path,
                 status: status as u16,
                 duration: format!("{:?}", start.elapsed()),
             });
-        } else if status.is_client_error() {
+        } else if status.is_client_error() || status.is_server_error() {
             log::warn!("--> Response sent", {
                 method: method,
                 path: path,
