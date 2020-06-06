@@ -204,7 +204,7 @@ impl Response {
     }
 
     /// Returns an optional reference to the `Error` if the response was created from one, or else `None`.
-    pub fn error(&mut self) -> Option<&Error> {
+    pub fn error(&self) -> Option<&Error> {
         self.res.error()
     }
 
