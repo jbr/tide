@@ -9,7 +9,7 @@ async fn main() -> tide::Result<()> {
 
     app.middleware(ErrorHandler::new(
         //there could be any number of these, and they'd be executed in order specified
-        |err: url::ParseError| async move {
+        |err: &url::ParseError| async move {
             let mut response = Response::new(StatusCode::ImATeapot);
             response.set_body(err.to_string());
             Ok(response)

@@ -1,22 +1,23 @@
-use crate::{Middleware, Next, Request, Result};
 use std::fmt::{Debug, Display};
 use std::future::Future;
-use std::pin::Pin;
+
+use crate::utils::BoxFuture;
+use crate::{Middleware, Next, Request};
 
 /// This trait maps from a specific error type to a tide::Result
 /// future and is implemented for
-/// `async Fn<E: Send + Sync + 'static>(E) -> tide::Result`
+/// `async Fn<E: Send + Sync + 'static>(&E) -> tide::Result`
 pub trait ErrorMapper<E>: Send + Sync + 'static {
-    fn call<'a>(&'a self, error: E) -> Pin<Box<dyn Future<Output = Result> + Send + 'a>>;
+    fn call<'a>(&'a self, error: &'a E) -> BoxFuture<'a, crate::Result>;
 }
 
 impl<E, F, Fut> ErrorMapper<E> for F
 where
     E: Send + Sync + 'static,
-    F: Fn(E) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result> + Send + 'static,
+    F: Fn(&E) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = crate::Result> + Send + Sync,
 {
-    fn call<'a>(&'a self, error: E) -> Pin<Box<dyn Future<Output = Result> + Send + 'a>> {
+    fn call<'a>(&'a self, error: &'a E) -> BoxFuture<'a, crate::Result> {
         Box::pin(async move { (self)(error).await })
     }
 }
@@ -90,16 +91,16 @@ where
         &'a self,
         req: Request<State>,
         next: Next<'a, State>,
-    ) -> Pin<Box<dyn Future<Output = Result> + Send + 'a>> {
+    ) -> BoxFuture<'a, crate::Result> {
         Box::pin(async move {
             let response = next.run(req).await;
-            if let Err(e) = response {
-                match e.downcast::<E>() {
-                    Ok(downcast) => self.0.call(downcast).await,
-                    Err(e) => Err(e),
+            if let Some(error) = response.error() {
+                match error.downcast_ref::<E>() {
+                    Some(e_ref) => self.0.call(e_ref).await,
+                    None => Ok(response),
                 }
             } else {
-                response
+                Ok(response)
             }
         })
     }
