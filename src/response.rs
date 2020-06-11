@@ -183,7 +183,7 @@ impl Response {
     ///
     /// ## Warning
     /// Take care when calling this function with a cookie that was returned by
-    /// [`Request::cookie`](Request::cookie).  As per [section 5.3 step 11 of RFC 6265], a new
+    /// [`Request::cookie`](crate::Request::cookie).  As per [section 5.3 step 11 of RFC 6265], a new
     /// cookie is only treated as the same as an old one if it has a matching name, domain and
     /// path.
     ///
@@ -195,7 +195,7 @@ impl Response {
     ///
     /// To avoid this you can manually set the [domain](Cookie::set_domain) and
     /// [path](Cookie::set_path) as necessary after retrieving the cookie using
-    /// [`Request::cookie`](Request::cookie).
+    /// [`Request::cookie`](crate::Request::cookie).
     ///
     /// [section 5.3 step 11 of RFC 6265]: https://tools.ietf.org/html/rfc6265#section-5.3
     pub fn remove_cookie(&mut self, cookie: Cookie<'static>) {
