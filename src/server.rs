@@ -4,7 +4,7 @@ use async_std::io;
 use async_std::sync::Arc;
 
 use crate::cookies;
-use crate::listener::{Listener, ToListener};
+use crate::listener::Listener;
 use crate::log;
 use crate::middleware::{Middleware, Next};
 use crate::router::{Router, Selection};
@@ -175,8 +175,8 @@ impl<State: Send + Sync + 'static> Server<State> {
     }
 
     /// Asynchronously serve the app with the supplied listener. For more details, see [Listener] and [ToListener]
-    pub async fn listen<TL: ToListener<State>>(self, listener: TL) -> io::Result<()> {
-        listener.to_listener()?.listen(self).await
+    pub async fn listen<TL: Listener<State>>(self, listener: TL) -> io::Result<()> {
+        listener.listen(self).await
     }
 
     /// Respond to a `Request` with a `Response`.

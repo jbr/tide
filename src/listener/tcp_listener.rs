@@ -1,7 +1,6 @@
 use super::is_transient_error;
 
-use crate::listener::Listener;
-use crate::utils::BoxFuture;
+use crate::listener::{Listener, ResultFuture};
 use crate::{log, Server};
 
 use std::fmt::{self, Display, Formatter};
@@ -62,7 +61,7 @@ fn handle_tcp<State: Send + Sync + 'static>(app: Server<State>, stream: TcpStrea
 }
 
 impl<State: Send + Sync + 'static> Listener<State> for TcpListener {
-    fn listen<'a>(&'a mut self, app: Server<State>) -> BoxFuture<'a, async_std::io::Result<()>> {
+    fn listen(mut self, app: Server<State>) -> ResultFuture {
         Box::pin(async move {
             self.connect().await?;
             let listener = self.listener()?;

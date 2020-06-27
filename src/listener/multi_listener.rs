@@ -1,11 +1,8 @@
-use crate::listener::{Listener, ToListener};
-use crate::utils::BoxFuture;
+use crate::listener::{Listener, ResultFuture};
 use crate::Server;
+use async_std::{io, task};
 
-use std::fmt::{self, Debug, Display, Formatter};
-
-use async_std::io;
-use async_std::prelude::*;
+use futures::stream::{futures_unordered::FuturesUnordered, StreamExt};
 
 /// MultiListener allows tide to listen on any number of transports
 /// simultaneously (such as tcp ports, unix sockets, or tls).
@@ -19,10 +16,10 @@ use async_std::prelude::*;
 ///        app.at("/").get(|_| async { Ok("Hello, world!") });
 ///
 ///        let mut multi = tide::listener::MultiListener::new();
-///        multi.add("127.0.0.1:8000")?;
-///        multi.add(async_std::net::TcpListener::bind("127.0.0.1:8001").await?)?;
+///        multi.bind("127.0.0.1:8000")?;
+///        multi.bind(async_std::net::TcpListener::bind("127.0.0.1:8001").await?)?;
 /// # if cfg!(unix) {
-///        multi.add("unix://unix.socket")?;
+///        multi.bind("unix://unix.socket")?;
 /// # }
 ///    
 /// # if false {
@@ -33,84 +30,34 @@ use async_std::prelude::*;
 ///}
 ///```
 
-#[derive(Default)]
-pub struct MultiListener<State>(Vec<Box<dyn Listener<State>>>);
+pub struct MultiListener<State>(
+    Server<State>,
+    FuturesUnordered<task::JoinHandle<io::Result<()>>>,
+);
+
+impl<State> std::fmt::Debug for MultiListener<State> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MultiListener").finish()
+    }
+}
 
 impl<State: Send + Sync + 'static> MultiListener<State> {
-    /// creates a new MultiListener
-    pub fn new() -> Self {
-        Self(vec![])
+    pub fn new(app: Server<State>) -> Self {
+        Self(app, FuturesUnordered::new())
     }
 
-    /// Adds any [`ToListener`](crate::listener::ToListener) to this
-    /// MultiListener. An error result represents a failure to convert
-    /// the [`ToListener`](crate::listener::ToListener) into a
-    /// [`Listener`](crate::listener::Listener).
-    ///
-    /// ```rust
-    /// # fn main() -> std::io::Result<()> {
-    /// let mut multi = tide::listener::MultiListener::new();
-    /// multi.add("127.0.0.1:8000")?;
-    /// multi.add(("localhost", 8001))?;
-    /// multi.add(std::net::TcpListener::bind(("localhost", 8002))?)?;
-    /// # std::mem::drop(tide::new().listen(multi)); // for the State generic
-    /// # Ok(()) }
-    /// ```
-    pub fn add<TL: ToListener<State>>(&mut self, listener: TL) -> io::Result<()> {
-        self.0.push(Box::new(listener.to_listener()?));
-        Ok(())
-    }
-
-    /// `MultiListener::with_listener` allows for chained construction of a MultiListener:
-    /// ```rust,no_run
-    /// # use tide::listener::MultiListener;
-    /// # fn main() -> std::io::Result<()> { async_std::task::block_on(async move {
-    /// # let app = tide::new();
-    /// app.listen(
-    ///     MultiListener::new()
-    ///         .with_listener("127.0.0.1:8080")
-    ///         .with_listener(async_std::net::TcpListener::bind("127.0.0.1:8081").await?),
-    /// ).await?;
-    /// #  Ok(()) }) }
-    pub fn with_listener<TL: ToListener<State>>(mut self, listener: TL) -> Self {
-        self.add(listener).expect("Unable to add listener");
-        self
+    pub fn bind<TL: Listener<State> + Send + Sync + 'static>(&mut self, listener: TL) {
+        self.1.push(task::spawn(listener.listen(self.0.clone())));
     }
 }
 
 impl<State: Send + Sync + 'static> Listener<State> for MultiListener<State> {
-    fn listen<'a>(&'a mut self, app: Server<State>) -> BoxFuture<'a, io::Result<()>> {
-        let mut fut: Option<BoxFuture<'a, io::Result<()>>> = None;
-
-        for listener in self.0.iter_mut() {
-            let app = app.clone();
-            let listened = listener.listen(app);
-            if let Some(f) = fut {
-                fut = Some(Box::pin(f.race(listened)));
-            } else {
-                fut = Some(Box::pin(listened));
+    fn listen(mut self, _: Server<State>) -> ResultFuture {
+        Box::pin(async move {
+            while let Some(result) = self.1.next().await {
+                result?;
             }
-        }
-
-        fut.expect("at least one listener must be provided to a MultiListener")
-    }
-}
-
-impl<State> Debug for MultiListener<State> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl<State> Display for MultiListener<State> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let string = self
-            .0
-            .iter()
-            .map(|l| l.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        writeln!(f, "{}", string)
+            Ok(())
+        })
     }
 }

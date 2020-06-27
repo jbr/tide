@@ -1,7 +1,6 @@
 use super::is_transient_error;
 
-use crate::listener::Listener;
-use crate::utils::BoxFuture;
+use crate::listener::{Listener, ResultFuture};
 use crate::{log, Server};
 
 use std::fmt::{self, Display, Formatter};
@@ -72,7 +71,7 @@ fn handle_unix<State: Send + Sync + 'static>(app: Server<State>, stream: UnixStr
 }
 
 impl<State: Send + Sync + 'static> Listener<State> for UnixListener {
-    fn listen<'a>(&'a mut self, app: Server<State>) -> BoxFuture<'a, io::Result<()>> {
+    fn listen(mut self, app: Server<State>) -> ResultFuture {
         Box::pin(async move {
             self.connect().await?;
             crate::log::info!("listening on {}", self);
