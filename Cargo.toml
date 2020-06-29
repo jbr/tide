@@ -60,3 +60,5 @@ required-features = ["unstable"]
 name = "router"
 harness = false
 
+[patch.crates-io]
+async-h1 = { git = "https://github.com/jbr/async-h1", branch = "head-reqs-no-body-content" }
